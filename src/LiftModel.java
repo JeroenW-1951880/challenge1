@@ -1,5 +1,5 @@
-import java.util.Observable;
-import java.util.Queue;
+import java.util.*;
+import java.util.concurrent.ArrayBlockingQueue;
 
 /**
  * modelklasse voor de lift
@@ -13,17 +13,19 @@ public class LiftModel extends Observable {
 
     enum LiftState { MAINTENANCE, ALARM, STILL, UP, DOWN };
 
+    private boolean mDoorsopen;
     private int mLiftPos;
     private Integer mCurrentCall;
     private LiftState mState;
-    private Queue<Integer> mCallQueue;
+    private ArrayBlockingQueue<Integer> mCallQueue;
 
     public LiftModel()
     {
         mLiftPos = 0;
         mCurrentCall = null;
         mState = LiftState.STILL;
-        mCallQueue = null;
+        mCallQueue = new ArrayBlockingQueue<Integer>(5);
+        mDoorsopen = false;
     }
 
     public int getLiftPos() {return mLiftPos;}
@@ -35,7 +37,11 @@ public class LiftModel extends Observable {
             mCurrentCall = floor;
             do_move();
         } else{
-            mCallQueue.add(floor);
+            try{
+                mCallQueue.add(floor);
+            } catch (IllegalStateException e){
+                System.err.println("callqueue is full");
+            }
         }
     }
 
@@ -44,22 +50,94 @@ public class LiftModel extends Observable {
             mCurrentCall = floor;
             do_move();
         } else{
-            mCallQueue.add(floor);
+            try{
+                mCallQueue.add(floor);
+            } catch (IllegalStateException e){
+                System.err.println("callqueue is full");
+            }
         }
     }
 
-    private void do_move()
+    private synchronized void do_move()
     {
-        if (mLiftPos > mCurrentCall){
-            mState = LiftState.DOWN;
-        } else if(mLiftPos < mCurrentCall){
-            mState = LiftState.DOWN;
-        } else{
-            //open doors
+        if(mState != LiftState.MAINTENANCE && mState != LiftState.ALARM){
+            if (mLiftPos > mCurrentCall){
+                mDoorsopen = false;
+                mState = LiftState.DOWN;
+                while (mLiftPos != mCurrentCall){
+                    try{wait(3000);}catch (InterruptedException e){}
+                    mLiftPos--;
+                    setChanged();
+                    notifyObservers();
+                }
+                mDoorsopen = true;
+            } else if(mLiftPos < mCurrentCall){
+                mDoorsopen = false;
+                mState = LiftState.UP;
+                while (mLiftPos != mCurrentCall){
+                    try{wait(3000);}catch (InterruptedException e){}
+                    mLiftPos++;
+                    setChanged();
+                    notifyObservers();
+                }
+                mDoorsopen = true;
+            } else{
+                mDoorsopen = true;
+            }
+            mState = LiftState.STILL;
+            setChanged();
+            notifyObservers();
+            next_call();
+        } else if (mState == LiftState.MAINTENANCE){
+            System.err.println("lift is under maintenance");
+        } else if (mState == LiftState.ALARM){
+            System.err.println("cant take the lift while emergency");
         }
-        setChanged();
-        notifyObservers();
-        //move lift
-        //currentcall is volgende in queue of null
+
+    }
+
+    private synchronized void next_call(){
+        if(mCallQueue.isEmpty()){
+            mCurrentCall = null;
+        } else {
+            mCurrentCall = mCallQueue.poll();
+            try{wait(3000);}catch (InterruptedException e){}
+            do_move();
+        }
+    }
+
+    public void toggle_maintenance(){
+        if(mState == LiftState.ALARM){
+            System.err.println("maintenance ignored");
+        } else if(mState != LiftState.MAINTENANCE){
+            mState = LiftState.MAINTENANCE;
+            setChanged();
+            notifyObservers();
+        } else{
+            mState = LiftState.STILL;
+            setChanged();
+            notifyObservers();
+            do_move();
+        }
+    }
+
+    public void open_liftdoors(){
+        if (mDoorsopen || mState != LiftState.STILL){
+            System.err.println("doors open ignored");
+        } else{
+            mDoorsopen = true;
+        }
+    }
+
+    public void close_liftdoors(){
+        if (!mDoorsopen || mState != LiftState.STILL || mState == LiftState.ALARM){
+            System.err.println("doors closed ignored");
+        } else{
+            mDoorsopen = false;
+        }
+    }
+
+    public void set_alarm(){
+        mState = LiftState.ALARM;
     }
 }

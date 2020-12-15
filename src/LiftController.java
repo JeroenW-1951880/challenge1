@@ -24,4 +24,12 @@ public class LiftController {
     public void on_floorsubmit_external(int floor){
         mModel.add_outside_call(floor);
     }
+
+    public void on_maintenance(){mModel.toggle_maintenance();}
+
+    public void on_open(){mModel.open_liftdoors();}
+
+    public void on_close(){mModel.close_liftdoors();}
+
+    public void on_alarm(){mModel.set_alarm();}
 }

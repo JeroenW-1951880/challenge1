@@ -90,6 +90,34 @@ public class InternalLiftView extends AbstractLiftView {
                 getmLiftcontroller().on_floorsubmit_internal((int)mFloorSelector.getValue());
             }
         });
+
+        mMaintenance.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                getmLiftcontroller().on_maintenance();
+            }
+        });
+
+        mDoorsOpen.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                getmLiftcontroller().on_open();
+            }
+        });
+
+        mDoorsClosed.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                getmLiftcontroller().on_close();
+            }
+        });
+
+        mAlarm.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                getmLiftcontroller().on_alarm();
+            }
+        });
     }
 
 }
