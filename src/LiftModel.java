@@ -1,5 +1,7 @@
 import java.util.*;
 import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 /**
  * modelklasse voor de lift
@@ -7,7 +9,7 @@ import java.util.concurrent.ArrayBlockingQueue;
  * @author Jeroen Weltens
  * tijd te kort voor contracten
  */
-public class LiftModel extends Observable {
+public class LiftModel extends Observable implements Runnable{
     public static int LOWEST_FLOOR = -1;
     public static int HIGHEST_FLOOR = 13;
 
@@ -35,7 +37,8 @@ public class LiftModel extends Observable {
     public void add_inside_call(int floor){
         if (mCurrentCall == null){
             mCurrentCall = floor;
-            do_move();
+            ExecutorService exec = Executors.newCachedThreadPool();
+            exec.execute(this);
         } else{
             try{
                 mCallQueue.add(floor);
@@ -48,7 +51,8 @@ public class LiftModel extends Observable {
     public void add_outside_call(int floor){
         if (mCurrentCall == null){
             mCurrentCall = floor;
-            do_move();
+            ExecutorService exec = Executors.newCachedThreadPool();
+            exec.execute(this);
         } else{
             try{
                 mCallQueue.add(floor);
@@ -58,51 +62,14 @@ public class LiftModel extends Observable {
         }
     }
 
-    private synchronized void do_move()
-    {
-        if(mState != LiftState.MAINTENANCE && mState != LiftState.ALARM){
-            if (mLiftPos > mCurrentCall){
-                mDoorsopen = false;
-                mState = LiftState.DOWN;
-                while (mLiftPos != mCurrentCall){
-                    try{wait(3000);}catch (InterruptedException e){}
-                    mLiftPos--;
-                    setChanged();
-                    notifyObservers();
-                }
-                mDoorsopen = true;
-            } else if(mLiftPos < mCurrentCall){
-                mDoorsopen = false;
-                mState = LiftState.UP;
-                while (mLiftPos != mCurrentCall){
-                    try{wait(3000);}catch (InterruptedException e){}
-                    mLiftPos++;
-                    setChanged();
-                    notifyObservers();
-                }
-                mDoorsopen = true;
-            } else{
-                mDoorsopen = true;
-            }
-            mState = LiftState.STILL;
-            setChanged();
-            notifyObservers();
-            next_call();
-        } else if (mState == LiftState.MAINTENANCE){
-            System.err.println("lift is under maintenance");
-        } else if (mState == LiftState.ALARM){
-            System.err.println("cant take the lift while emergency");
-        }
-
-    }
-
     private synchronized void next_call(){
         if(mCallQueue.isEmpty()){
             mCurrentCall = null;
         } else {
             mCurrentCall = mCallQueue.poll();
-            try{wait(3000);}catch (InterruptedException e){}
-            do_move();
+            try{Thread.sleep(3000);}catch (InterruptedException e){}
+            ExecutorService exec = Executors.newCachedThreadPool();
+            exec.execute(this);
         }
     }
 
@@ -117,7 +84,8 @@ public class LiftModel extends Observable {
             mState = LiftState.STILL;
             setChanged();
             notifyObservers();
-            do_move();
+            ExecutorService exec = Executors.newCachedThreadPool();
+            exec.execute(this);
         }
     }
 
@@ -139,5 +107,42 @@ public class LiftModel extends Observable {
 
     public void set_alarm(){
         mState = LiftState.ALARM;
+    }
+
+    @Override
+    public void run() {
+        if(mState != LiftState.MAINTENANCE && mState != LiftState.ALARM){
+            if (mLiftPos > mCurrentCall){
+                mDoorsopen = false;
+                mState = LiftState.DOWN;
+                while (mLiftPos != mCurrentCall){
+                    try{Thread.sleep(3000);}catch (InterruptedException e){}
+                    mLiftPos--;
+                    setChanged();
+                    notifyObservers();
+                }
+                mDoorsopen = true;
+            } else if(mLiftPos < mCurrentCall){
+                mDoorsopen = false;
+                mState = LiftState.UP;
+                while (mLiftPos != mCurrentCall){
+                    try{Thread.sleep(3000);}catch (InterruptedException e){}
+                    mLiftPos++;
+                    setChanged();
+                    notifyObservers();
+                }
+                mDoorsopen = true;
+            } else{
+                mDoorsopen = true;
+            }
+            mState = LiftState.STILL;
+            setChanged();
+            notifyObservers();
+            next_call();
+        } else if (mState == LiftState.MAINTENANCE){
+            System.err.println("lift is under maintenance");
+        } else if (mState == LiftState.ALARM){
+            System.err.println("cant take the lift while emergency");
+        }
     }
 }
